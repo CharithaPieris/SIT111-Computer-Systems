@@ -1,0 +1,94 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/02/ALU.hdl
+
+/**
+ * The ALU. Computes one of the following functions:
+ * x+y, x-y, y–x, 0, 1, -1, x, y, -x, -y, !x, !y,
+ * x+1, y+1, x-1, y-1, x&y, x|y on two 16-bit inputs.
+ * Which function to compute is determined by 6 input bits 
+ * denoted zx, nx, zy, ny, f, no.
+ * The computed function's value is called "out".
+ * In addition to computing out, the ALU computes two 
+ * 1-bit outputs called zr and ng:
+ * if out == 0, zr = 1; otherwise zr = 0;
+ * If out < 0, ng = 1; otherwise ng = 0.
+ * The 6-bit combinations (zx,nx,zy,ny,f,no) and 
+ * their effect are documented in the book. 
+ */
+
+// Implementation: the ALU manipulates the x and y
+// inputs and then operates on the resulting values, 
+// as follows:
+// if (zx  == 1) sets x = 0        // 16-bit constant
+// if (nx  == 1) sets x = ~x       // bitwise "not"
+// if (zy  == 1) sets y = 0        // 16-bit constant
+// if (ny  == 1) sets y = ~y       // bitwise "not"
+// if (f   == 1) sets out = x + y  // integer 2's-complement addition
+// if (f   == 0) sets out = x & y  // bitwise And
+// if (no  == 1) sets out = ~out   // bitwise Not
+// if (out == 0) sets zr = 1
+// if (out < 0)  sets ng = 1
+
+  
+CHIP ALU {
+    IN  
+        x[16], y[16],  // 16-bit inputs
+        zx, // zero the x input?
+        nx, // negate the x input?
+        zy, // zero the y input?
+        ny, // negate the y input?
+        f,  // compute  out = x + y (if f == 1) or out = x & y (if == 0)
+        no; // negate the out output?
+
+    OUT 
+        out[16], // 16-bit output
+        zr, // 1 if (out == 0), 0 otherwise
+        ng; // 1 if (out < 0),  0 otherwise
+
+    PARTS:
+    Not16(in=x, out=notx);
+    Not16(in=y, out=noty);
+    Mux4Way16(sel[1]=nx, sel[0]=zx   // note order
+            , a=x         // sel: 00
+            , b=false     // sel: 01
+            , c=notx      // sel: 10
+            , d=true      // sel: 11
+            , out=x1);    // x1 now has the value to operate on
+    Mux4Way16(sel[1]=ny, sel[0]=zy  // note order
+            , a = y       // sel: 00
+            , b = false   // sel: 01
+            , c = noty    // sel: 10
+            , d = true    // sel: 11
+            , out=y1);    // y1 now has the value to operate on
+
+    // operate on x1/y1
+    Add16(a=x1, b=y1, out=xPlusy);
+    And16(a=x1, b=y1, out=xAndy);
+    // pick the operation
+    Mux16(sel=f
+        , a=xAndy, b=xPlusy
+        , out=out1);      // temp output, need to pick out1/notout1
+    Not16(in=out1, out=notout1);
+
+    // pick the output
+    Mux16(sel=no
+        , a=out1, b=notout1
+        // I could make a Or16Way gate, not sure if that would not be better
+        , out[0..7]   = outLow
+        , out[8..15]  = outHigh
+        // if [15] is true, int is negative
+        , out[15]     = ng
+        , out         = out);
+
+    // determine if out is zero
+    Or8Way(in = outLow,  out = zrLow);
+    Or8Way(in = outHigh, out = zrHigh);
+    Or(a=zrLow, b=zrHigh, out=notzr);
+    // 0 | 0 => 0 so while my notation may seem backwards
+    // notzr is false when out is 0
+    // so Not(notzr) is what we are looking for
+    Not(in=notzr, out=zr);
+
+}
