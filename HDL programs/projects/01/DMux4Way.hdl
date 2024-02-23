@@ -1,0 +1,35 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/01/DMux4Way.hdl
+
+/**
+ * 4-way demultiplexor.  
+ * {a,b,c,d} = {in,0,0,0} if sel == 00
+ *             {0,in,0,0} if sel == 01
+ *             {0,0,in,0} if sel == 10
+ *             {0,0,0,in} if sel == 11
+ */
+
+
+CHIP DMux4Way {
+
+
+    IN in, sel[2];
+
+    OUT a, b, c, d;
+
+    PARTS:
+    // Again, similarly to Mux, I use the last bit to
+    // get our in into t1, or t2
+    DMux(in=in, sel=sel[1], a=t1, b=t2);
+
+    // And then I use the first bit to stuff in into the correct
+    // variable.  The trick here is that one of these two
+    // DMux gates will not matter.  Because either t1 or t2 will
+    // be false from the gate above.  If it is t1 for example,
+    // this first gate takes false, and puts false into a,
+    // and false into b as well.
+    DMux(in=t1, sel=sel[0], a=a,  b=b);
+    DMux(in=t2, sel=sel[0], a=c,  b=d);
+}
